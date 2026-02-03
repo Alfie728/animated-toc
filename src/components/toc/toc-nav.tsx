@@ -39,7 +39,10 @@ interface PathGeometry {
   points: { x: number; y: number; lengthAtPoint: number }[];
 }
 
-function computePathGeometry(items: FlatTocItem[], minDepth: number): PathGeometry {
+function computePathGeometry(
+  items: FlatTocItem[],
+  minDepth: number,
+): PathGeometry {
   const pathSegments: string[] = [];
   const points: { x: number; y: number; lengthAtPoint: number }[] = [];
   const lengthToItemCenter: number[] = [];
@@ -71,7 +74,11 @@ function computePathGeometry(items: FlatTocItem[], minDepth: number): PathGeomet
     const distanceToCenter = itemCenter - itemTop;
     lengthToItemCenter.push(accumulatedLength + distanceToCenter);
 
-    points.push({ x, y: itemCenter, lengthAtPoint: accumulatedLength + distanceToCenter });
+    points.push({
+      x,
+      y: itemCenter,
+      lengthAtPoint: accumulatedLength + distanceToCenter,
+    });
 
     const itemSegmentHeight = itemBottom - itemTop;
     accumulatedLength += itemSegmentHeight;
@@ -104,9 +111,10 @@ function interpolatePointOnPath(
 
     if (targetLength <= currPoint.lengthAtPoint) {
       const segmentLength = currPoint.lengthAtPoint - prevPoint.lengthAtPoint;
-      const ratio = segmentLength > 0
-        ? (targetLength - prevPoint.lengthAtPoint) / segmentLength
-        : 0;
+      const ratio =
+        segmentLength > 0
+          ? (targetLength - prevPoint.lengthAtPoint) / segmentLength
+          : 0;
       return {
         x: prevPoint.x + (currPoint.x - prevPoint.x) * ratio,
         y: prevPoint.y + (currPoint.y - prevPoint.y) * ratio,
@@ -178,6 +186,7 @@ export function TocNav({ items, activeId }: TocNavProps) {
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
+          aria-hidden="true"
         >
           <path
             strokeLinecap="round"
@@ -196,6 +205,7 @@ export function TocNav({ items, activeId }: TocNavProps) {
             width={PATH_WIDTH}
             height={containerHeight}
             viewBox={`0 0 ${PATH_WIDTH} ${containerHeight}`}
+            aria-hidden="true"
           >
             <path
               d={svgPath}

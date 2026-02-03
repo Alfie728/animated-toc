@@ -20,7 +20,8 @@ export function useActiveSection(sectionIds: string[]) {
     const observer = new IntersectionObserver(
       (entries) => {
         const scrolledToBottom =
-          window.innerHeight + window.scrollY >= document.body.scrollHeight - 50;
+          window.innerHeight + window.scrollY >=
+          document.body.scrollHeight - 50;
         if (scrolledToBottom) return;
 
         const visibleEntries = entries.filter((entry) => entry.isIntersecting);
