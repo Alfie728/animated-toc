@@ -1,65 +1,182 @@
-import Image from "next/image";
+"use client";
+
+import { AnimatedToc, type TocItem } from "~/components/animated-toc";
+import { useActiveSection } from "~/hooks/use-active-section";
+
+const tocItems: TocItem[] = [
+  { id: "introduction", title: "Introduction", level: 1 },
+  { id: "core-concepts", title: "Core Concepts", level: 1 },
+  { id: "architecture", title: "Architecture", level: 2 },
+  { id: "data-flow", title: "Data Flow", level: 2 },
+  { id: "components", title: "Components", level: 1 },
+  { id: "button", title: "Button", level: 2 },
+  { id: "card", title: "Card", level: 2 },
+  { id: "input", title: "Input", level: 2 },
+  { id: "utilities", title: "Utilities", level: 1 },
+  { id: "deployment", title: "Deployment", level: 1 },
+];
 
 export default function Home() {
+  const activeId = useActiveSection(tocItems.map((item) => item.id));
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-white dark:bg-zinc-950">
+      <div className="mx-auto max-w-6xl px-4 py-16">
+        <div className="flex gap-16">
+          {/* Main Content */}
+          <main className="flex-1 max-w-2xl">
+            <Section id="introduction" title="Introduction">
+              <p>
+                Welcome to our comprehensive documentation. This guide will walk
+                you through everything you need to know to get started with our
+                platform.
+              </p>
+              <p>
+                Whether you&apos;re a beginner or an experienced developer,
+                you&apos;ll find valuable information here to help you build
+                amazing applications.
+              </p>
+            </Section>
+
+            <Section id="core-concepts" title="Core Concepts">
+              <p>
+                Before diving into the implementation details, it&apos;s
+                important to understand the core concepts that power our
+                platform.
+              </p>
+              <p>
+                These foundational principles will help you make better
+                architectural decisions and write more maintainable code.
+              </p>
+            </Section>
+
+            <Section id="architecture" title="Architecture" level={2}>
+              <p>
+                Our architecture follows a modular design pattern that promotes
+                separation of concerns and makes testing easier.
+              </p>
+              <p>
+                Each module is self-contained and communicates with others
+                through well-defined interfaces.
+              </p>
+            </Section>
+
+            <Section id="data-flow" title="Data Flow" level={2}>
+              <p>
+                Understanding how data flows through the application is crucial
+                for debugging and optimization.
+              </p>
+              <p>
+                We use a unidirectional data flow pattern that makes state
+                changes predictable and easy to trace.
+              </p>
+            </Section>
+
+            <Section id="components" title="Components">
+              <p>
+                Our component library provides a set of reusable UI elements
+                that follow accessibility best practices.
+              </p>
+              <p>
+                Each component is designed to be composable and customizable to
+                fit your specific needs.
+              </p>
+            </Section>
+
+            <Section id="button" title="Button" level={2}>
+              <p>
+                The Button component is one of the most commonly used elements.
+                It supports multiple variants including primary, secondary, and
+                ghost styles.
+              </p>
+              <p>
+                Buttons can include icons, loading states, and are fully
+                keyboard accessible.
+              </p>
+            </Section>
+
+            <Section id="card" title="Card" level={2}>
+              <p>
+                Cards are versatile containers that group related content
+                together. They can include headers, footers, and various content
+                types.
+              </p>
+              <p>
+                Use cards to create visual hierarchy and organize information in
+                a scannable way.
+              </p>
+            </Section>
+
+            <Section id="input" title="Input" level={2}>
+              <p>
+                Input components handle user text entry with built-in validation
+                and error handling.
+              </p>
+              <p>
+                They support various types including text, email, password, and
+                number inputs.
+              </p>
+            </Section>
+
+            <Section id="utilities" title="Utilities">
+              <p>
+                Our utility functions help you perform common operations without
+                reinventing the wheel.
+              </p>
+              <p>
+                From date formatting to string manipulation, these utilities are
+                tree-shakeable and TypeScript-ready.
+              </p>
+            </Section>
+
+            <Section id="deployment" title="Deployment">
+              <p>
+                Deploying your application is straightforward with our CLI
+                tools. We support multiple deployment targets including Vercel,
+                AWS, and self-hosted options.
+              </p>
+              <p>
+                Follow our deployment checklist to ensure a smooth production
+                release.
+              </p>
+            </Section>
+          </main>
+
+          {/* Sticky TOC Sidebar */}
+          <aside className="hidden lg:block w-64 flex-shrink-0">
+            <div className="sticky top-16">
+              <AnimatedToc items={tocItems} activeId={activeId} />
+            </div>
+          </aside>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
     </div>
+  );
+}
+
+function Section({
+  id,
+  title,
+  level = 1,
+  children,
+}: {
+  id: string;
+  title: string;
+  level?: number;
+  children: React.ReactNode;
+}) {
+  const Tag = level === 1 ? "h2" : "h3";
+  const titleClass =
+    level === 1
+      ? "text-2xl font-bold mb-4 text-zinc-900 dark:text-zinc-100"
+      : "text-xl font-semibold mb-3 text-zinc-800 dark:text-zinc-200";
+
+  return (
+    <section id={id} className="mb-16 scroll-mt-16">
+      <Tag className={titleClass}>{title}</Tag>
+      <div className="space-y-4 text-zinc-600 dark:text-zinc-400 leading-relaxed">
+        {children}
+      </div>
+    </section>
   );
 }
