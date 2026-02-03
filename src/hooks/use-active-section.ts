@@ -8,29 +8,37 @@ export function useActiveSection(sectionIds: string[]) {
   useEffect(() => {
     if (sectionIds.length === 0) return;
 
+    const handleScroll = () => {
+      const scrolledToBottom =
+        window.innerHeight + window.scrollY >= document.body.scrollHeight - 50;
+
+      if (scrolledToBottom) {
+        setActiveId(sectionIds[sectionIds.length - 1]);
+      }
+    };
+
     const observer = new IntersectionObserver(
       (entries) => {
-        // Find the first visible section from the top
+        // Skip if scrolled to bottom (handled by scroll listener)
+        const scrolledToBottom =
+          window.innerHeight + window.scrollY >= document.body.scrollHeight - 50;
+        if (scrolledToBottom) return;
+
         const visibleEntries = entries.filter((entry) => entry.isIntersecting);
 
         if (visibleEntries.length > 0) {
-          // Sort by position in the document and take the topmost
           const sorted = visibleEntries.sort((a, b) => {
-            const aRect = a.boundingClientRect;
-            const bRect = b.boundingClientRect;
-            return aRect.top - bRect.top;
+            return a.boundingClientRect.top - b.boundingClientRect.top;
           });
-
           setActiveId(sorted[0].target.id);
         }
       },
       {
         rootMargin: "-10% 0px -80% 0px",
         threshold: 0,
-      }
+      },
     );
 
-    // Observe all sections
     for (const id of sectionIds) {
       const element = document.getElementById(id);
       if (element) {
@@ -38,7 +46,13 @@ export function useActiveSection(sectionIds: string[]) {
       }
     }
 
-    return () => observer.disconnect();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll(); // Check initial state
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", handleScroll);
+    };
   }, [sectionIds]);
 
   return activeId;

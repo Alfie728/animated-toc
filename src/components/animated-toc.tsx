@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 export interface TocItem {
   id: string;
@@ -126,7 +126,11 @@ export function AnimatedToc({ items, activeId }: AnimatedTocProps) {
   const dotX = useMotionValue(points[0]?.x ?? 1);
   const dotY = useMotionValue(points[0]?.y ?? PADDING);
 
+  // Track click-initiated scrolling to avoid conflicts with scroll-based updates
+  const isClickScrolling = useRef(false);
+
   useEffect(() => {
+    if (isClickScrolling.current) return;
     currentLength.set(itemLengths[activeIndex] ?? 0);
   }, [activeIndex, itemLengths, currentLength]);
 
@@ -139,8 +143,14 @@ export function AnimatedToc({ items, activeId }: AnimatedTocProps) {
   }, [smoothLength, points, dotX, dotY]);
 
   const handleClick = (id: string, index: number) => {
+    isClickScrolling.current = true;
     currentLength.set(itemLengths[index] ?? 0);
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+
+    // Reset after scroll animation completes
+    setTimeout(() => {
+      isClickScrolling.current = false;
+    }, 1000);
   };
 
   return (
