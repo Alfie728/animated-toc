@@ -6,6 +6,12 @@ import { useEffect, useMemo, useRef } from "react";
 export interface TocItem {
   id: string;
   title: string;
+  children?: TocItem[];
+}
+
+interface FlatTocItem {
+  id: string;
+  title: string;
   level: number;
 }
 
@@ -19,6 +25,13 @@ const PATH_WIDTH = 16;
 const INDENT_STEP = 12;
 const PADDING = 8;
 
+function flattenItems(items: TocItem[], level = 0): FlatTocItem[] {
+  return items.flatMap((item) => [
+    { id: item.id, title: item.title, level },
+    ...(item.children ? flattenItems(item.children, level + 1) : []),
+  ]);
+}
+
 interface PathData {
   d: string;
   length: number;
@@ -26,7 +39,7 @@ interface PathData {
   points: { x: number; y: number; length: number }[];
 }
 
-function generatePath(items: TocItem[], minLevel: number): PathData {
+function generatePath(items: FlatTocItem[], minLevel: number): PathData {
   const segments: string[] = [];
   const points: { x: number; y: number; length: number }[] = [];
   const itemLengths: number[] = [];
@@ -104,20 +117,21 @@ function getPointAtLength(
 }
 
 export function AnimatedToc({ items, activeId }: AnimatedTocProps) {
-  const minLevel = Math.min(...items.map((item) => item.level));
+  const flatItems = useMemo(() => flattenItems(items), [items]);
+  const minLevel = Math.min(...flatItems.map((item) => item.level));
 
   const { d: pathD, length: pathLength, itemLengths, points } = useMemo(
-    () => generatePath(items, minLevel),
-    [items, minLevel],
+    () => generatePath(flatItems, minLevel),
+    [flatItems, minLevel],
   );
 
-  const totalHeight = items.length * ITEM_HEIGHT;
+  const totalHeight = flatItems.length * ITEM_HEIGHT;
 
   const activeIndex = useMemo(() => {
     if (!activeId) return 0;
-    const idx = items.findIndex((item) => item.id === activeId);
+    const idx = flatItems.findIndex((item) => item.id === activeId);
     return idx !== -1 ? idx : 0;
-  }, [activeId, items]);
+  }, [activeId, flatItems]);
 
   const currentLength = useMotionValue(itemLengths[0] ?? 0);
   const smoothLength = useSpring(currentLength, { bounce: 0 });
@@ -207,7 +221,7 @@ export function AnimatedToc({ items, activeId }: AnimatedTocProps) {
         </div>
 
         <ul className="flex flex-col">
-          {items.map((item, index) => (
+          {flatItems.map((item, index) => (
             <li key={item.id} style={{ height: ITEM_HEIGHT }}>
               <button
                 type="button"

@@ -4,20 +4,37 @@ import { AnimatedToc, type TocItem } from "~/components/animated-toc";
 import { useActiveSection } from "~/hooks/use-active-section";
 
 const tocItems: TocItem[] = [
-  { id: "introduction", title: "Introduction", level: 1 },
-  { id: "core-concepts", title: "Core Concepts", level: 1 },
-  { id: "architecture", title: "Architecture", level: 2 },
-  { id: "data-flow", title: "Data Flow", level: 2 },
-  { id: "components", title: "Components", level: 1 },
-  { id: "button", title: "Button", level: 2 },
-  { id: "card", title: "Card", level: 2 },
-  { id: "input", title: "Input", level: 2 },
-  { id: "utilities", title: "Utilities", level: 1 },
-  { id: "deployment", title: "Deployment", level: 1 },
+  { id: "introduction", title: "Introduction" },
+  {
+    id: "core-concepts",
+    title: "Core Concepts",
+    children: [
+      { id: "architecture", title: "Architecture" },
+      { id: "data-flow", title: "Data Flow" },
+    ],
+  },
+  {
+    id: "components",
+    title: "Components",
+    children: [
+      { id: "button", title: "Button" },
+      { id: "card", title: "Card" },
+      { id: "input", title: "Input" },
+    ],
+  },
+  { id: "utilities", title: "Utilities" },
+  { id: "deployment", title: "Deployment" },
 ];
 
+function flattenIds(items: TocItem[]): string[] {
+  return items.flatMap((item) => [
+    item.id,
+    ...(item.children ? flattenIds(item.children) : []),
+  ]);
+}
+
 export default function Home() {
-  const activeId = useActiveSection(tocItems.map((item) => item.id));
+  const activeId = useActiveSection(flattenIds(tocItems));
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950">
