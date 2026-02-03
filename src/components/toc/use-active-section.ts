@@ -19,7 +19,6 @@ export function useActiveSection(sectionIds: string[]) {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        // Skip if scrolled to bottom (handled by scroll listener)
         const scrolledToBottom =
           window.innerHeight + window.scrollY >= document.body.scrollHeight - 50;
         if (scrolledToBottom) return;
@@ -47,7 +46,7 @@ export function useActiveSection(sectionIds: string[]) {
     }
 
     window.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll(); // Check initial state
+    handleScroll();
 
     return () => {
       observer.disconnect();

@@ -15,7 +15,7 @@ interface FlatTocItem {
   level: number;
 }
 
-interface AnimatedTocProps {
+interface TocNavProps {
   items: TocItem[];
   activeId?: string;
 }
@@ -59,29 +59,23 @@ function generatePath(items: FlatTocItem[], minLevel: number): PathData {
       prevX = x;
       prevY = top;
     } else {
-      // Diagonal from previous bottom to this top
       const dx = x - prevX;
       const dy = top - prevY;
       length += Math.sqrt(dx * dx + dy * dy);
       segments.push(`L${x} ${top}`);
     }
 
-    // Store point at top of item
     points.push({ x, y: top, length });
 
-    // Vertical line to center (where item length is measured)
     const toCenter = center - top;
     itemLengths.push(length + toCenter);
 
-    // Store point at center
     points.push({ x, y: center, length: length + toCenter });
 
-    // Vertical line to bottom
     const toBottom = bottom - top;
     length += toBottom;
     segments.push(`L${x} ${bottom}`);
 
-    // Store point at bottom
     points.push({ x, y: bottom, length });
 
     prevX = x;
@@ -116,7 +110,7 @@ function getPointAtLength(
   return { x: last.x, y: last.y };
 }
 
-export function AnimatedToc({ items, activeId }: AnimatedTocProps) {
+export function TocNav({ items, activeId }: TocNavProps) {
   const flatItems = useMemo(() => flattenItems(items), [items]);
   const minLevel = Math.min(...flatItems.map((item) => item.level));
 
@@ -140,7 +134,6 @@ export function AnimatedToc({ items, activeId }: AnimatedTocProps) {
   const dotX = useMotionValue(points[0]?.x ?? 1);
   const dotY = useMotionValue(points[0]?.y ?? PADDING);
 
-  // Track click-initiated scrolling to avoid conflicts with scroll-based updates
   const isClickScrolling = useRef(false);
 
   useEffect(() => {
@@ -161,7 +154,6 @@ export function AnimatedToc({ items, activeId }: AnimatedTocProps) {
     currentLength.set(itemLengths[index] ?? 0);
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
-    // Reset after scroll animation completes
     setTimeout(() => {
       isClickScrolling.current = false;
     }, 1000);
