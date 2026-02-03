@@ -119,27 +119,27 @@ export function AnimatedToc({ items, activeId }: AnimatedTocProps) {
     return idx !== -1 ? idx : 0;
   }, [activeId, items]);
 
-  const progress = useMotionValue(itemLengths[0] ?? 0);
-  const smoothProgress = useSpring(progress, { bounce: 0 });
-  const dashOffset = useTransform(smoothProgress, (v) => pathLength - v);
+  const currentLength = useMotionValue(itemLengths[0] ?? 0);
+  const smoothLength = useSpring(currentLength, { bounce: 0 });
+  const dashOffset = useTransform(smoothLength, (length) => pathLength - length);
 
   const dotX = useMotionValue(points[0]?.x ?? 1);
   const dotY = useMotionValue(points[0]?.y ?? PADDING);
 
   useEffect(() => {
-    progress.set(itemLengths[activeIndex] ?? 0);
-  }, [activeIndex, itemLengths, progress]);
+    currentLength.set(itemLengths[activeIndex] ?? 0);
+  }, [activeIndex, itemLengths, currentLength]);
 
   useEffect(() => {
-    return smoothProgress.on("change", (v) => {
-      const point = getPointAtLength(points, v);
+    return smoothLength.on("change", (length) => {
+      const point = getPointAtLength(points, length);
       dotX.set(point.x);
       dotY.set(point.y);
     });
-  }, [smoothProgress, points, dotX, dotY]);
+  }, [smoothLength, points, dotX, dotY]);
 
   const handleClick = (id: string, index: number) => {
-    progress.set(itemLengths[index] ?? 0);
+    currentLength.set(itemLengths[index] ?? 0);
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
   };
 
