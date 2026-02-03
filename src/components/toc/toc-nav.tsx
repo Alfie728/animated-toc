@@ -12,7 +12,7 @@ export interface TocItem {
 interface FlatTocItem {
   id: string;
   title: string;
-  level: number;
+  depth: number;
 }
 
 interface TocNavProps {
@@ -22,140 +22,151 @@ interface TocNavProps {
 
 const ITEM_HEIGHT = 32;
 const PATH_WIDTH = 16;
-const INDENT_STEP = 12;
-const PADDING = 8;
+const INDENT_PER_LEVEL = 12;
+const VERTICAL_PADDING = 8;
 
-function flattenItems(items: TocItem[], level = 0): FlatTocItem[] {
+function flattenItems(items: TocItem[], depth = 0): FlatTocItem[] {
   return items.flatMap((item) => [
-    { id: item.id, title: item.title, level },
-    ...(item.children ? flattenItems(item.children, level + 1) : []),
+    { id: item.id, title: item.title, depth },
+    ...(item.children ? flattenItems(item.children, depth + 1) : []),
   ]);
 }
 
-interface PathData {
-  d: string;
-  length: number;
-  itemLengths: number[];
-  points: { x: number; y: number; length: number }[];
+interface PathGeometry {
+  svgPath: string;
+  totalLength: number;
+  lengthToItemCenter: number[];
+  points: { x: number; y: number; lengthAtPoint: number }[];
 }
 
-function generatePath(items: FlatTocItem[], minLevel: number): PathData {
-  const segments: string[] = [];
-  const points: { x: number; y: number; length: number }[] = [];
-  const itemLengths: number[] = [];
-  let length = 0;
+function computePathGeometry(items: FlatTocItem[], minDepth: number): PathGeometry {
+  const pathSegments: string[] = [];
+  const points: { x: number; y: number; lengthAtPoint: number }[] = [];
+  const lengthToItemCenter: number[] = [];
+  let accumulatedLength = 0;
   let prevX = 0;
   let prevY = 0;
 
   for (let i = 0; i < items.length; i++) {
-    const indent = (items[i].level - minLevel) * INDENT_STEP;
+    const indent = (items[i].depth - minDepth) * INDENT_PER_LEVEL;
     const x = 1 + indent;
-    const top = i * ITEM_HEIGHT + PADDING;
-    const bottom = (i + 1) * ITEM_HEIGHT - PADDING;
-    const center = (top + bottom) / 2;
+    const itemTop = i * ITEM_HEIGHT + VERTICAL_PADDING;
+    const itemBottom = (i + 1) * ITEM_HEIGHT - VERTICAL_PADDING;
+    const itemCenter = (itemTop + itemBottom) / 2;
 
     if (i === 0) {
-      segments.push(`M${x} ${top}`);
+      pathSegments.push(`M${x} ${itemTop}`);
       prevX = x;
-      prevY = top;
+      prevY = itemTop;
     } else {
-      const dx = x - prevX;
-      const dy = top - prevY;
-      length += Math.sqrt(dx * dx + dy * dy);
-      segments.push(`L${x} ${top}`);
+      const deltaX = x - prevX;
+      const deltaY = itemTop - prevY;
+      const diagonalLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      accumulatedLength += diagonalLength;
+      pathSegments.push(`L${x} ${itemTop}`);
     }
 
-    points.push({ x, y: top, length });
+    points.push({ x, y: itemTop, lengthAtPoint: accumulatedLength });
 
-    const toCenter = center - top;
-    itemLengths.push(length + toCenter);
+    const distanceToCenter = itemCenter - itemTop;
+    lengthToItemCenter.push(accumulatedLength + distanceToCenter);
 
-    points.push({ x, y: center, length: length + toCenter });
+    points.push({ x, y: itemCenter, lengthAtPoint: accumulatedLength + distanceToCenter });
 
-    const toBottom = bottom - top;
-    length += toBottom;
-    segments.push(`L${x} ${bottom}`);
+    const itemSegmentHeight = itemBottom - itemTop;
+    accumulatedLength += itemSegmentHeight;
+    pathSegments.push(`L${x} ${itemBottom}`);
 
-    points.push({ x, y: bottom, length });
+    points.push({ x, y: itemBottom, lengthAtPoint: accumulatedLength });
 
     prevX = x;
-    prevY = bottom;
+    prevY = itemBottom;
   }
 
-  return { d: segments.join(" "), length, itemLengths, points };
+  return {
+    svgPath: pathSegments.join(" "),
+    totalLength: accumulatedLength,
+    lengthToItemCenter,
+    points,
+  };
 }
 
-function getPointAtLength(
-  points: { x: number; y: number; length: number }[],
+function interpolatePointOnPath(
+  points: { x: number; y: number; lengthAtPoint: number }[],
   targetLength: number,
 ): { x: number; y: number } {
   if (points.length === 0) return { x: 0, y: 0 };
   if (targetLength <= 0) return { x: points[0].x, y: points[0].y };
 
   for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
+    const prevPoint = points[i - 1];
+    const currPoint = points[i];
 
-    if (targetLength <= curr.length) {
-      const segmentLength = curr.length - prev.length;
-      const t = segmentLength > 0 ? (targetLength - prev.length) / segmentLength : 0;
+    if (targetLength <= currPoint.lengthAtPoint) {
+      const segmentLength = currPoint.lengthAtPoint - prevPoint.lengthAtPoint;
+      const ratio = segmentLength > 0
+        ? (targetLength - prevPoint.lengthAtPoint) / segmentLength
+        : 0;
       return {
-        x: prev.x + (curr.x - prev.x) * t,
-        y: prev.y + (curr.y - prev.y) * t,
+        x: prevPoint.x + (currPoint.x - prevPoint.x) * ratio,
+        y: prevPoint.y + (currPoint.y - prevPoint.y) * ratio,
       };
     }
   }
 
-  const last = points[points.length - 1];
-  return { x: last.x, y: last.y };
+  const lastPoint = points[points.length - 1];
+  return { x: lastPoint.x, y: lastPoint.y };
 }
 
 export function TocNav({ items, activeId }: TocNavProps) {
   const flatItems = useMemo(() => flattenItems(items), [items]);
-  const minLevel = Math.min(...flatItems.map((item) => item.level));
+  const minDepth = Math.min(...flatItems.map((item) => item.depth));
 
-  const { d: pathD, length: pathLength, itemLengths, points } = useMemo(
-    () => generatePath(flatItems, minLevel),
-    [flatItems, minLevel],
+  const { svgPath, totalLength, lengthToItemCenter, points } = useMemo(
+    () => computePathGeometry(flatItems, minDepth),
+    [flatItems, minDepth],
   );
 
-  const totalHeight = flatItems.length * ITEM_HEIGHT;
+  const containerHeight = flatItems.length * ITEM_HEIGHT;
 
   const activeIndex = useMemo(() => {
     if (!activeId) return 0;
-    const idx = flatItems.findIndex((item) => item.id === activeId);
-    return idx !== -1 ? idx : 0;
+    const index = flatItems.findIndex((item) => item.id === activeId);
+    return index !== -1 ? index : 0;
   }, [activeId, flatItems]);
 
-  const currentLength = useMotionValue(itemLengths[0] ?? 0);
-  const smoothLength = useSpring(currentLength, { bounce: 0 });
-  const dashOffset = useTransform(smoothLength, (length) => pathLength - length);
+  const targetLength = useMotionValue(lengthToItemCenter[0] ?? 0);
+  const animatedLength = useSpring(targetLength, { bounce: 0 });
+  const strokeDashOffset = useTransform(
+    animatedLength,
+    (length) => totalLength - length,
+  );
 
   const dotX = useMotionValue(points[0]?.x ?? 1);
-  const dotY = useMotionValue(points[0]?.y ?? PADDING);
+  const dotY = useMotionValue(points[0]?.y ?? VERTICAL_PADDING);
 
-  const isClickScrolling = useRef(false);
-
-  useEffect(() => {
-    if (isClickScrolling.current) return;
-    currentLength.set(itemLengths[activeIndex] ?? 0);
-  }, [activeIndex, itemLengths, currentLength]);
+  const isScrollingFromClick = useRef(false);
 
   useEffect(() => {
-    return smoothLength.on("change", (length) => {
-      const point = getPointAtLength(points, length);
+    if (isScrollingFromClick.current) return;
+    targetLength.set(lengthToItemCenter[activeIndex] ?? 0);
+  }, [activeIndex, lengthToItemCenter, targetLength]);
+
+  useEffect(() => {
+    return animatedLength.on("change", (length) => {
+      const point = interpolatePointOnPath(points, length);
       dotX.set(point.x);
       dotY.set(point.y);
     });
-  }, [smoothLength, points, dotX, dotY]);
+  }, [animatedLength, points, dotX, dotY]);
 
-  const handleClick = (id: string, index: number) => {
-    isClickScrolling.current = true;
-    currentLength.set(itemLengths[index] ?? 0);
+  const handleItemClick = (id: string, index: number) => {
+    isScrollingFromClick.current = true;
+    targetLength.set(lengthToItemCenter[index] ?? 0);
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
     setTimeout(() => {
-      isClickScrolling.current = false;
+      isScrollingFromClick.current = false;
     }, 1000);
   };
 
@@ -183,11 +194,11 @@ export function TocNav({ items, activeId }: TocNavProps) {
           <svg
             className="absolute inset-0 overflow-visible"
             width={PATH_WIDTH}
-            height={totalHeight}
-            viewBox={`0 0 ${PATH_WIDTH} ${totalHeight}`}
+            height={containerHeight}
+            viewBox={`0 0 ${PATH_WIDTH} ${containerHeight}`}
           >
             <path
-              d={pathD}
+              d={svgPath}
               className="stroke-zinc-200 dark:stroke-zinc-800"
               strokeWidth={2}
               fill="none"
@@ -195,14 +206,14 @@ export function TocNav({ items, activeId }: TocNavProps) {
               strokeLinejoin="round"
             />
             <motion.path
-              d={pathD}
+              d={svgPath}
               className="stroke-zinc-400 dark:stroke-zinc-500"
               strokeWidth={2}
               fill="none"
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeDasharray={pathLength}
-              style={{ strokeDashoffset: dashOffset }}
+              strokeDasharray={totalLength}
+              style={{ strokeDashoffset: strokeDashOffset }}
             />
           </svg>
 
@@ -217,14 +228,14 @@ export function TocNav({ items, activeId }: TocNavProps) {
             <li key={item.id} style={{ height: ITEM_HEIGHT }}>
               <button
                 type="button"
-                onClick={() => handleClick(item.id, index)}
+                onClick={() => handleItemClick(item.id, index)}
                 className={`flex items-center h-full text-sm transition-colors hover:text-zinc-900 dark:hover:text-zinc-100 ${
                   activeIndex === index
                     ? "text-zinc-900 dark:text-zinc-100 font-medium"
                     : "text-zinc-500 dark:text-zinc-400"
                 }`}
                 style={{
-                  paddingLeft: 12 + (item.level - minLevel) * INDENT_STEP,
+                  paddingLeft: 12 + (item.depth - minDepth) * INDENT_PER_LEVEL,
                 }}
               >
                 {item.title}
