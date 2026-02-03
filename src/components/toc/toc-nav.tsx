@@ -164,7 +164,7 @@ export function TocNav({ items, activeId }: TocNavProps) {
     return animatedLength.on("change", (length) => {
       const point = interpolatePointOnPath(points, length);
       dotX.set(point.x);
-      dotY.set(point.y);
+      dotY.set(point.y - 1); // Adjust for dot center
     });
   }, [animatedLength, points, dotX, dotY]);
 
