@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo } from "react";
 
 export interface TocItem {
   id: string;
@@ -17,63 +17,100 @@ interface AnimatedTocProps {
 const ITEM_HEIGHT = 32;
 const PATH_WIDTH = 16;
 const INDENT_STEP = 12;
+const PADDING = 8;
 
-function generatePath(items: TocItem[], minLevel: number) {
-  const positions: { x: number; y: number }[] = [];
+interface PathData {
+  d: string;
+  length: number;
+  itemLengths: number[];
+  points: { x: number; y: number; length: number }[];
+}
+
+function generatePath(items: TocItem[], minLevel: number): PathData {
   const segments: string[] = [];
-  const PADDING = 8; // Vertical padding to create room for diagonal transitions
+  const points: { x: number; y: number; length: number }[] = [];
+  const itemLengths: number[] = [];
+  let length = 0;
+  let prevX = 0;
+  let prevY = 0;
 
   for (let i = 0; i < items.length; i++) {
     const indent = (items[i].level - minLevel) * INDENT_STEP;
     const x = 1 + indent;
     const top = i * ITEM_HEIGHT + PADDING;
     const bottom = (i + 1) * ITEM_HEIGHT - PADDING;
-
-    positions.push({ x, y: (top + bottom) / 2 });
+    const center = (top + bottom) / 2;
 
     if (i === 0) {
       segments.push(`M${x} ${top}`);
+      prevX = x;
+      prevY = top;
     } else {
-      // Diagonal from previous item's bottom to this item's top
+      // Diagonal from previous bottom to this top
+      const dx = x - prevX;
+      const dy = top - prevY;
+      length += Math.sqrt(dx * dx + dy * dy);
       segments.push(`L${x} ${top}`);
     }
-    // Vertical line for this item
+
+    // Store point at top of item
+    points.push({ x, y: top, length });
+
+    // Vertical line to center (where item length is measured)
+    const toCenter = center - top;
+    itemLengths.push(length + toCenter);
+
+    // Store point at center
+    points.push({ x, y: center, length: length + toCenter });
+
+    // Vertical line to bottom
+    const toBottom = bottom - top;
+    length += toBottom;
     segments.push(`L${x} ${bottom}`);
+
+    // Store point at bottom
+    points.push({ x, y: bottom, length });
+
+    prevX = x;
+    prevY = bottom;
   }
 
-  return { d: segments.join(" "), positions };
+  return { d: segments.join(" "), length, itemLengths, points };
 }
 
-function findLengthAtPoint(
-  path: SVGPathElement,
-  targetY: number,
-  totalLength: number,
-) {
-  let low = 0;
-  let high = totalLength;
+function getPointAtLength(
+  points: { x: number; y: number; length: number }[],
+  targetLength: number,
+): { x: number; y: number } {
+  if (points.length === 0) return { x: 0, y: 0 };
+  if (targetLength <= 0) return { x: points[0].x, y: points[0].y };
 
-  for (let i = 0; i < 20; i++) {
-    const mid = (low + high) / 2;
-    const point = path.getPointAtLength(mid);
-    if (point.y < targetY) {
-      low = mid;
-    } else {
-      high = mid;
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+
+    if (targetLength <= curr.length) {
+      const segmentLength = curr.length - prev.length;
+      const t = segmentLength > 0 ? (targetLength - prev.length) / segmentLength : 0;
+      return {
+        x: prev.x + (curr.x - prev.x) * t,
+        y: prev.y + (curr.y - prev.y) * t,
+      };
     }
   }
 
-  return (low + high) / 2;
+  const last = points[points.length - 1];
+  return { x: last.x, y: last.y };
 }
 
 export function AnimatedToc({ items, activeId }: AnimatedTocProps) {
-  const pathRef = useRef<SVGPathElement>(null);
-  const [pathLength, setPathLength] = useState(0);
-
   const minLevel = Math.min(...items.map((item) => item.level));
-  const { d: pathD, positions } = useMemo(
+
+  const { d: pathD, length: pathLength, itemLengths, points } = useMemo(
     () => generatePath(items, minLevel),
     [items, minLevel],
   );
+
   const totalHeight = items.length * ITEM_HEIGHT;
 
   const activeIndex = useMemo(() => {
@@ -82,41 +119,24 @@ export function AnimatedToc({ items, activeId }: AnimatedTocProps) {
     return idx !== -1 ? idx : 0;
   }, [activeId, items]);
 
-  useLayoutEffect(() => {
-    if (pathRef.current) {
-      setPathLength(pathRef.current.getTotalLength());
-    }
-  }, []);
-
-  const itemLengths = useMemo(() => {
-    const path = pathRef.current;
-    if (!path || pathLength === 0) return [];
-    return positions.map((pos) => findLengthAtPoint(path, pos.y, pathLength));
-  }, [positions, pathLength]);
-
-  const progress = useMotionValue(0);
+  const progress = useMotionValue(itemLengths[0] ?? 0);
   const smoothProgress = useSpring(progress, { bounce: 0 });
   const dashOffset = useTransform(smoothProgress, (v) => pathLength - v);
 
-  const dotX = useMotionValue(positions[0]?.x ?? PATH_WIDTH - 1);
-  const dotY = useMotionValue(positions[0]?.y ?? ITEM_HEIGHT / 2);
+  const dotX = useMotionValue(points[0]?.x ?? 1);
+  const dotY = useMotionValue(points[0]?.y ?? PADDING);
 
   useEffect(() => {
-    if (itemLengths.length > 0) {
-      progress.set(itemLengths[activeIndex] ?? 0);
-    }
+    progress.set(itemLengths[activeIndex] ?? 0);
   }, [activeIndex, itemLengths, progress]);
 
   useEffect(() => {
     return smoothProgress.on("change", (v) => {
-      const path = pathRef.current;
-      if (path && pathLength > 0) {
-        const point = path.getPointAtLength(v);
-        dotX.set(point.x);
-        dotY.set(point.y);
-      }
+      const point = getPointAtLength(points, v);
+      dotX.set(point.x);
+      dotY.set(point.y);
     });
-  }, [smoothProgress, pathLength, dotX, dotY]);
+  }, [smoothProgress, points, dotX, dotY]);
 
   const handleClick = (id: string, index: number) => {
     progress.set(itemLengths[index] ?? 0);
@@ -151,7 +171,6 @@ export function AnimatedToc({ items, activeId }: AnimatedTocProps) {
             viewBox={`0 0 ${PATH_WIDTH} ${totalHeight}`}
           >
             <path
-              ref={pathRef}
               d={pathD}
               className="stroke-zinc-200 dark:stroke-zinc-800"
               strokeWidth={2}
@@ -159,26 +178,22 @@ export function AnimatedToc({ items, activeId }: AnimatedTocProps) {
               strokeLinecap="round"
               strokeLinejoin="round"
             />
-            {pathLength > 0 && (
-              <motion.path
-                d={pathD}
-                className="stroke-zinc-400 dark:stroke-zinc-500"
-                strokeWidth={2}
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeDasharray={pathLength}
-                style={{ strokeDashoffset: dashOffset }}
-              />
-            )}
+            <motion.path
+              d={pathD}
+              className="stroke-zinc-400 dark:stroke-zinc-500"
+              strokeWidth={2}
+              fill="none"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray={pathLength}
+              style={{ strokeDashoffset: dashOffset }}
+            />
           </svg>
 
-          {pathLength > 0 && (
-            <motion.div
-              className="absolute w-2 h-2 bg-zinc-900 dark:bg-zinc-100 rounded-full -translate-x-1/2 -translate-y-1/2"
-              style={{ left: dotX, top: dotY }}
-            />
-          )}
+          <motion.div
+            className="absolute w-2 h-2 bg-zinc-900 dark:bg-zinc-100 rounded-full -translate-x-1/2 -translate-y-1/2"
+            style={{ left: dotX, top: dotY }}
+          />
         </div>
 
         <ul className="flex flex-col">
