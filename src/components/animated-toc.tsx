@@ -150,7 +150,7 @@ export function AnimatedToc({ items, activeId }: AnimatedTocProps) {
       if (pathRef.current && pathLength > 0) {
         const point = pathRef.current.getPointAtLength(value);
         dotX.set(point.x);
-        dotY.set(point.y);
+        dotY.set(point.y - ITEM_HEIGHT / 2);
       }
     });
     return unsubscribe;
